@@ -1,12 +1,15 @@
 <link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/ui-lightness/jquery-ui.css" rel="stylesheet" type="text/css"/>
 <link rel="stylesheet" type="text/css" href="<?=plugin_dir_url( __FILE__ )?>plugins/colorpicker/jquery.colorpicker.css">
 
-<div class="wrap">
-	<div id="icon-options-general" class="icon32"><br /></div>
-	<span class="alignright"><a target="_blank" href="http://www.smtplw.com.br/"><img src="<?=plugin_dir_url( __FILE__ )?>assets/images/logoMontenegroDigital.png" alt="Voucher Tec by Travel Tec" style="height: 46px"></a></span> 
+<div class="wrap"> 
     <h1>Voucher Tec - Passagens Aéreas</h1> 
     <p>Uma conta é necessária para utilizar esse plugin. Se você já tem a chave de licença inserida, basta realizar as configurações abaixo.</p>
 	<p>Se precisa se cadastrar, você pode fazer em <a target="_blank" href="https://montenegrodigital.com.br/sistemas-de-reservas/">https://montenegrodigital.com.br/sistemas-de-reservas/</a>.</p>
+
+	<input type="text" value="[FLG_FORM_SEARCH_FLIGHTS]" id="myInput" style="width: 45%;background-color: #ddd;font-weight: 700;border: none;" disabled>
+
+				<!-- The button used to copy the text -->
+				<button onclick="myFunction()" class="button button-secondary ct_tax_media_button">Copiar</button>
  
 		<h3>Configuração</h3>
 		<?php
@@ -122,7 +125,13 @@
   document.execCommand("copy");
 
   /* Alert the copied text */
-  alert("Copied the text: " + copyText.value);
+  return Swal.fire({ 
+
+                    text: "Texto copiado com sucesso.",
+
+                    icon: "success",
+
+                }); 
 } 
           jQuery(function() {
             jQuery('.cp-alt').colorpicker({

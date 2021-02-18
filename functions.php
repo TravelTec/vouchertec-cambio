@@ -10,7 +10,7 @@ GitHub Plugin URI: https://github.com/TravelTec/flights_plugin
 
 Description: Voucher Tec - Passagens aéreas é um plugin que disponibiliza um motor de reservas para o consumidor final efetuar pesquisas de passagens aéreas nacionais e internacionais, diretamente no site.
 
-Version: 1.0.0
+Version: 1.0.1
 
 Author: Travel Tec
 

@@ -1,6 +1,4 @@
-<div class="wrap">
-    <div id="icon-options-general" class="icon32"><br /></div>
-    <span class="alignright"><a target="_blank" href="http://www.smtplw.com.br/"><img src="<?=plugin_dir_url( __FILE__ )?>assets/images/logoMontenegroDigital.png" alt="Voucher Tec by Travel Tec" style="height: 46px"></a></span> 
+<div class="wrap"> 
     <h1>Voucher Tec - Passagens Aéreas</h1>
     <p>O plugin Voucher Tec - Passagens aéreas precisa ser ativado. <br><br>Abaixo, adicione/edite sua chave de licença para utilização do serviço. </p>
 
