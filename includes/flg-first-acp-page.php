@@ -1,12 +1,13 @@
 <link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/ui-lightness/jquery-ui.css" rel="stylesheet" type="text/css"/>
 <link rel="stylesheet" type="text/css" href="<?=plugin_dir_url( __FILE__ )?>plugins/colorpicker/jquery.colorpicker.css">
+<link rel='stylesheet' id='appointment-font-awesome-css-css'  href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css?ver=5.6.1' type='text/css' media='all' />
 
 <div class="wrap"> 
     <h1>Voucher Tec - Passagens Aéreas</h1> 
     <p>Uma conta é necessária para utilizar esse plugin. Se você já tem a chave de licença inserida, basta realizar as configurações abaixo.</p>
 	<p>Se precisa se cadastrar, você pode fazer em <a target="_blank" href="https://montenegrodigital.com.br/sistemas-de-reservas/">https://montenegrodigital.com.br/sistemas-de-reservas/</a>.</p>
 
-	<input type="text" value="[FLG_FORM_SEARCH_FLIGHTS]" id="myInput" style="width: 45%;background-color: #ddd;font-weight: 700;border: none;" disabled>
+	<input type="text" value="[FLG_SEARCH_FLIGHTS_CODE]" id="myInput" style="width: 45%;background-color: #ddd;font-weight: 700;border: none;cursor: not-allowed;">
 
 				<!-- The button used to copy the text -->
 				<button onclick="myFunction()" class="button button-secondary ct_tax_media_button">Copiar</button>
@@ -113,25 +114,13 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@10"></script>
 <script src="<?=plugin_dir_url( __FILE__ )?>plugins/colorpicker/jquery.colorpicker.js"></script>
 <script type="text/javascript">
-	function myFunction() {
-  /* Get the text field */
-  var copyText = document.getElementById("myInput");
+	function myFunction() { 
 
-  /* Select the text field */
-  copyText.select();
-  copyText.setSelectionRange(0, 99999); /* For mobile devices */
-
-  /* Copy the text inside the text field */
+  jQuery("#myInput").select();  
   document.execCommand("copy");
 
   /* Alert the copied text */
-  return Swal.fire({ 
-
-                    text: "Texto copiado com sucesso.",
-
-                    icon: "success",
-
-                }); 
+  jQuery(".ct_tax_media_button").html("<i class='fa fa-check'></i> Copiado"); 
 } 
           jQuery(function() {
             jQuery('.cp-alt').colorpicker({
