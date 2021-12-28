@@ -1,2 +1,2 @@
 # flights_plugin
-Plugin para ser utilizado em Wordpress que terá como finalidade disponibilizar um formulário de buscas (motor de reservas) para o consumidor final efetuar pesquisas de passagens aéreas nacionais e internacionais, diretamente no site da agência ou operadora.
+Plugin para ser utilizado em Wordpress que terá como finalidade permitir a conversão da moeda utilizada para produtos cadastrados no sistema Woocommerce, diretamente no site da agência ou operadora.
