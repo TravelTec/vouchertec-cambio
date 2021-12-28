@@ -10,6 +10,24 @@
  */
 session_start();
 
+add_action( 'admin_init', 'cambio_update_checker_setting' );  
+
+function cambio_update_checker_setting() { 
+
+        if ( ! is_admin() || ! class_exists( 'Puc_v4_Factory' ) ) {  
+            return;  
+        }  
+
+        $myUpdateChecker = Puc_v4_Factory::buildUpdateChecker( 
+            'https://github.com/TravelTec/vouchertec-cambio',  
+            __FILE__,  
+            'cambio'  
+        );  
+	
+        $myUpdateChecker->setBranch('master'); 
+
+    }
+
 add_filter( 'product_type_options', 'add_e_visa_product_option' );
 function add_e_visa_product_option( $product_type_options ) {
     $product_type_options['evisa'] = array(
