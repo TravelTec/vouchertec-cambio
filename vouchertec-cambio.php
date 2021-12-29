@@ -1,18 +1,27 @@
 <?php
+defined( 'ABSPATH' ) or die( 'No script kiddies please!' ); 
+
 /*
  	* Plugin Name: Vouchertec - Câmbio
  	* Plugin URI: https://traveltec.com.br
  	* Description: Utilize o plugin de Câmbio para conversão dos valores dos seus produtos Woocommerce.
  	* Author: Travel Tec
  	* Author URI: https://traveltec.com.br
- 	* Version: 1.1.0
+ 	* Version: 1.2.0
  	*
  */
-session_start();
+session_start(); 
 
 add_action( 'admin_init', 'cambio_update_checker_setting' );  
 
 function cambio_update_checker_setting() { 
+	
+	register_setting( 'vouchertec-cambio', 'serial' );
+	register_setting( 'vouchertec-cambio', 'type' );
+	register_setting( 'vouchertec-cambio', 'exibition' );
+	register_setting( 'vouchertec-cambio', 'data' );
+	register_setting( 'vouchertec-cambio', 'price_comercial' );
+	register_setting( 'vouchertec-cambio', 'price_turismo' );
 
         if ( ! is_admin() || ! class_exists( 'Puc_v4_Factory' ) ) {  
             return;  
@@ -28,25 +37,6 @@ function cambio_update_checker_setting() {
 
     }
 
-add_filter( 'product_type_options', 'add_e_visa_product_option' );
-function add_e_visa_product_option( $product_type_options ) {
-    $product_type_options['evisa'] = array(
-        'id'            => '_evisa',
-        'wrapper_class' => 'show_if_simple show_if_variable show_if_external',
-        'label'         => __( '$C', 'woocommerce' ),
-        'description'   => __( '', 'woocommerce' ),
-        'default'       => 'no'
-    );
-	$product_type_options['ecred'] = array(
-        'id'            => '_ecred',
-        'wrapper_class' => 'show_if_simple show_if_variable show_if_external',
-        'label'         => __( '$T', 'woocommerce' ),
-        'description'   => __( '', 'woocommerce' ),
-        'default'       => 'no'
-    );
-
-    return $product_type_options;
-}
 
 add_action( 'woocommerce_order_status_changed', 'your_function', 99, 3 ); 
 function your_function( $order_id, $old_status, $new_status ){  
@@ -770,14 +760,14 @@ function action_checkout_order_processed( $order_id, $posted_data, $order ) {
 }
 
 
-add_action( 'woocommerce_process_product_meta_simple', 'save_evisa_option_fields'  );
-add_action( 'woocommerce_process_product_meta_variable', 'save_evisa_option_fields'  );
-function save_evisa_option_fields( $post_id ) {
-    $is_e_visa = isset( $_POST['_evisa'] ) ? 'yes' : 'no';
-    update_post_meta( $post_id, '_evisa', $is_e_visa );
-    $is_e_cred = isset( $_POST['_ecred'] ) ? 'yes' : 'no';
-    update_post_meta( $post_id, '_ecred', $is_e_cred );
+function my_enqueue() { 
+    wp_enqueue_style('bootstrap-datepicker', 'https://apps.bdimg.com/libs/jqueryui/1.10.4/css/jquery-ui.min.css');
+	
+    wp_enqueue_script('cambio_script', 'https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.11.2/jquery.mask.min.js');
+    wp_enqueue_script('bootstrap-datepicker', 'https://apps.bdimg.com/libs/jqueryui/1.10.4/jquery-ui.min.js');
 }
+
+add_action('admin_enqueue_scripts', 'my_enqueue');
 
 add_action( 'wp_enqueue_scripts', 'enqueue_scripts_cambio' ); 
 function enqueue_scripts_cambio() { 
@@ -984,4 +974,159 @@ function change_price_order(){
 	}
 }
 
+add_action('admin_menu', 'addPluginAdminMenu');  
+function addPluginAdminMenu() { 
+	add_menu_page(  'Câmbio', 'Câmbio', 'administrator', 'vouchertec-cambio', 'displayPluginAdminDashboard', 'dashicons-chart-area', 26 ); 
+	add_submenu_page( 'vouchertec-cambio', 'Serial', 'Serial', 'administrator', 'vouchertec-cambio-settings', 'displayPluginAdminSettings');
+}
+
+function displayPluginAdminDashboard() {
+	require_once 'partials/vouchertec-cambio-admin-display.php';
+}
+
+function displayPluginAdminSettings() {
+	require_once 'partials/vouchertec-cambio-admin-settings-display.php';
+}
+ 
+
+add_shortcode('vouchertec-cambio', 'dotiavatar_function');
+function dotiavatar_function() {
+	$tipo = get_option("type"); //0 = automática | 1 = manual
+	$exibicao = get_option("exibition"); //0 = comercial e turismo | 1 = comercial | 2 = turismo
+	
+	if($tipo == 0){
+		$curl = curl_init();
+
+		curl_setopt_array($curl, array(
+			CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_ENCODING => "",
+			CURLOPT_MAXREDIRS => 10,
+			CURLOPT_TIMEOUT => 30,
+			CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			CURLOPT_CUSTOMREQUEST => "GET", 
+			CURLOPT_HTTPHEADER => array(
+				"cache-control: no-cache",
+				"content-type: application/json",
+				"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
+			),
+		));
+
+		$response = curl_exec($curl);
+		$err = curl_error($curl);
+
+		curl_close($curl);
+
+		if ($err) {
+			echo "cURL Error #:" . $err;
+		} else {
+			$dados = array_values(json_decode($response, true)); 
+ 
+			$valor_dolar_comercial = number_format($dados[0]["high"], 2, ".", ""); 
+		}
+		
+		$curl = curl_init();
+
+		curl_setopt_array($curl, array(
+			CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRLT",
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_ENCODING => "",
+			CURLOPT_MAXREDIRS => 10,
+			CURLOPT_TIMEOUT => 30,
+			CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			CURLOPT_CUSTOMREQUEST => "GET", 
+			CURLOPT_HTTPHEADER => array(
+				"cache-control: no-cache",
+				"content-type: application/json",
+				"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
+			),
+		));
+
+		$response = curl_exec($curl);
+		$err = curl_error($curl);
+
+		curl_close($curl);
+
+		if ($err) {
+			echo "cURL Error #:" . $err;
+		} else {
+			$dados = array_values(json_decode($response, true)); 
+ 
+			$valor_dolar_turismo = number_format($dados[0]["high"], 2, ".", ""); 
+		}
+	}else{
+		$valor_dolar_turismo = get_option("price_turismo");
+		$valor_dolar_comercial = get_option("price_comercial");
+	}
+	
+	$retorno = '';
+	$retorno .= '<h2 style="font-size: 14px!important;color: #000000;margin: 0;">
+                                    <b>CÂMBIO:</b> <small>'.date("d/m/Y").'</small>
+                                </h2>';
+	if($exibicao != 2){
+                                $retorno .= '<h2 style="font-size: 13px!important;margin: 0;font-weight: 500;">Dólar comercial <small>'.$valor_dolar_comercial.'</small></h2>';
+	}
+	if($exibicao != 1){
+                                $retorno .= '<h2 style="font-size: 13px!important;margin: 0;font-weight: 500;">Dólar turismo <small>'.$valor_dolar_turismo.'</small></h2>';
+	}
+     return $retorno;
+}
+
+// Add a Custom product Admin Field
+add_action( 'woocommerce_product_options_general_product_data', 'add_custom_product_general_field' );
+function add_custom_product_general_field() {
+    echo '<div class="options_group">';
+	
+	woocommerce_wp_select(array(
+		'id' => '_select_exchange',
+		'label' => __('Moeda', 'woocommerce'),
+		'desc_tip'      => 'true',
+        'description'   => __('Informe a moeda que será utilizada para o produto', 'woocommerce'),
+		'options' => array(
+			'_selection' => 'Selecione...',
+			'_evisa' => 'Dólar comercial',
+			'_ecred' => 'Dólar turismo',
+			'_ereal' => 'Real'
+		),
+	));
+
+    echo '</div>';
+}
+
+add_action( 'woocommerce_process_product_meta', 'woo_add_custom_general_fields_save' );
+function woo_add_custom_general_fields_save( $post_id ){
+
+// Select
+    $woocommerce_select = $_POST['_select_exchange'];
+	update_post_meta( $post_id, '_select_exchange', esc_attr( $woocommerce_select ) );
+	 
+	switch($woocommerce_select){
+		case '_selection':
+			update_post_meta( $post_id, '_evisa', 'no' );
+			update_post_meta( $post_id, '_ecred', 'no' );
+			update_post_meta( $post_id, '_ereal', 'yes' ); 
+			break;
+		case '_evisa':
+			update_post_meta( $post_id, '_evisa', 'yes' );
+			update_post_meta( $post_id, '_ecred', 'no' );
+			update_post_meta( $post_id, '_ereal', 'no' ); 
+			break;
+		case '_ecred':
+			update_post_meta( $post_id, '_evisa', 'no' );
+			update_post_meta( $post_id, '_ecred', 'yes' );
+			update_post_meta( $post_id, '_ereal', 'no' ); 
+			break;
+		case '_ereal':
+			update_post_meta( $post_id, '_evisa', 'no' );
+			update_post_meta( $post_id, '_ecred', 'no' );
+			update_post_meta( $post_id, '_ereal', 'yes' ); 
+			break;
+		default:
+			update_post_meta( $post_id, '_evisa', 'no' );
+			update_post_meta( $post_id, '_ecred', 'no' );
+			update_post_meta( $post_id, '_ereal', 'yes' ); 
+			break;
+	}
+	
+}
 ?>
