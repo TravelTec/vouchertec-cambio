@@ -12,6 +12,8 @@ defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
  */
 session_start(); 
 
+require 'plugin-update-checker-4.10/plugin-update-checker.php';
+
 add_action( 'admin_init', 'cambio_update_checker_setting' );  
 
 function cambio_update_checker_setting() { 
