@@ -7,7 +7,7 @@ defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
  	* Description: Utilize o plugin de Câmbio para conversão dos valores dos seus produtos Woocommerce.
  	* Author: Travel Tec
  	* Author URI: https://traveltec.com.br
- 	* Version: 1.2.1
+ 	* Version: 1.2.3
  	*
  */
 session_start(); 
@@ -55,7 +55,9 @@ function conectar_mysql_wp($server, $user, $pass, $database){
 function valida_serial(){
 	//1. checa se existe o token
 	//2. checa se já existe um domínio cadastrado para o token
+	//3. checa se o domínio cadastrado, caso houver, é igual ao domínio da instalação
 	$serial = get_option( 'serial' );
+	$serial_url = base64_encode($serial.';'.$_SERVER['HTTP_HOST']);
 	
 	$conn = $results->conectar_mysql_wp('162.214.165.237', 'travelte_wordpress', 'Travel#2021@', 'travelte_wordpress'); 
 	
@@ -64,8 +66,26 @@ function valida_serial(){
 		$query->execute();
 		$dados = $sql_user->fetch(\PDO::FETCH_ASSOC);    
 		
+		//checa se existe o token
 		if(!empty($dados) || $dados != null){
-			return true;
+			$query = $conn->prepare("SELECT * FROM wp_postmeta WHERE token_key_url = '$serial_url'");
+			$query->execute();
+			$dados = $sql_user->fetch(\PDO::FETCH_ASSOC);  
+			
+			//checa se já existe domínio cadastrado
+			if(!empty($dados) || $dados != null){ 
+				$serial_por_url = explode(";", base64_decode($serial_url));
+				$dominio = $serial_por_url[1];
+
+				//checa se o domínio cadastrado é igual ao da hospedagem
+				if($dominio == $_SERVER['HTTP_HOST']){
+					return true;
+				}else{
+					return false;	
+				}
+			}else{
+				return false;
+			}
 		}else{
 			return false;
 		}
