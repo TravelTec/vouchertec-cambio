@@ -1011,11 +1011,11 @@ function change_price_order(){
 }
 
 add_action('admin_menu', 'addPluginAdminMenu');  
-function addPluginAdminMenu() { 
-	add_menu_page(  'Câmbio', 'Câmbio', 'administrator', 'vouchertec-cambio', 'displayPluginAdminDashboard', 'dashicons-chart-area', 26 ); 
+function addPluginAdminMenu() {  
 	if(valida_serial()){
-		add_submenu_page( 'vouchertec-cambio', 'Serial', 'Serial', 'administrator', 'vouchertec-cambio-settings', 'displayPluginAdminSettings');
+		add_menu_page(  'Câmbio', 'Câmbio', 'administrator', 'vouchertec-cambio', 'displayPluginAdminDashboard', 'dashicons-chart-area', 26 );
 	}
+	add_submenu_page( 'vouchertec-cambio', 'Serial', 'Serial', 'administrator', 'vouchertec-cambio-settings', 'displayPluginAdminSettings');
 }
 
 function displayPluginAdminDashboard() {
