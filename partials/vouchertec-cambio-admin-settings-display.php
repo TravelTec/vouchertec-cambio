@@ -29,6 +29,7 @@
 						</th>
 						<td>
 							<input type="text" class="regular-text" name="serial" value="<?php esc_attr_e( get_option( 'serial' ) ); ?>" maxlength="18" placeholder="Nº de serial válido" />
+							<input type="hidden" class="regular-text" name="serial_url" value="<?= (get_option( 'serial' ).';'.$_SERVER['HTTP_HOST']) ?>"/>
 							<p class="description"><?php _e( 'O número de serial da sua licença.', 'vouchertec-cambio' ); ?></p>
 						</td>
 					</tr> 
