@@ -57,7 +57,7 @@ function valida_serial(){
 	//2. checa se já existe um domínio cadastrado para o token
 	//3. checa se o domínio cadastrado, caso houver, é igual ao domínio da instalação
 	$serial = get_option( 'serial' );
-	$serial_url = base64_encode($serial.';'.$_SERVER['HTTP_HOST']);
+	$serial_url = get_option( 'serial_url' );
 	
 	$conn = conectar_mysql_wp('162.214.165.237', 'travelte_wordpress', 'Travel#2021@', 'travelte_wordpress'); 
 	
@@ -69,26 +69,27 @@ function valida_serial(){
 		//checa se existe o token
 		if(!empty($dados) || $dados != null){
 			//checa se já existe domínio cadastrado
-			if(!empty($dados) || $dados != null){ 
-				$serial_por_url = explode(";", base64_decode($serial_url));
+			if(!empty($serial_url)){ 
+				$serial_por_url = explode(";", $serial_url);
 				$dominio = $serial_por_url[1];
 
 				//checa se o domínio cadastrado é igual ao da hospedagem
 				if($dominio == $_SERVER['HTTP_HOST']){
 					return "1";
 				}else{
-					return "0";	
+					return "0a";	
 				}
 			}else{
-				return "0";
+				return "0b";
 			}
 		}else{
-			return "0";
+			return "0c";
 		}
 	}else{
-		return "0";
+		return "0d";
 	}
 }
+			    		 			
 
 add_action( 'woocommerce_order_status_changed', 'your_function', 99, 3 ); 
 function your_function( $order_id, $old_status, $new_status ){  
@@ -1028,7 +1029,7 @@ function change_price_order(){
 
 add_action('admin_menu', 'addPluginAdminMenu');  
 function addPluginAdminMenu() { 
-	$validar = valida_serial();
+	$validar = valida_serial(); 
 	
 		add_menu_page(  'Câmbio', 'Câmbio', 'administrator', 'vouchertec-cambio', 'displayPluginAdminSettings', 'dashicons-chart-area', 26 );
 	if($validar == "1"){
