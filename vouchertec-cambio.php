@@ -59,19 +59,15 @@ function valida_serial(){
 	$serial = get_option( 'serial' );
 	$serial_url = base64_encode($serial.';'.$_SERVER['HTTP_HOST']);
 	
-	$conn = $results->conectar_mysql_wp('162.214.165.237', 'travelte_wordpress', 'Travel#2021@', 'travelte_wordpress'); 
+	$conn = conectar_mysql_wp('162.214.165.237', 'travelte_wordpress', 'Travel#2021@', 'travelte_wordpress'); 
 	
 	if($serial != ""){
-		$query = $conn->prepare("SELECT * FROM wp_postmeta WHERE token_key = '$serial'");
+		$query = $conn->prepare("SELECT * FROM wp_postmeta WHERE meta_key = 'token_key' AND meta_value = '$serial'");
 		$query->execute();
-		$dados = $sql_user->fetch(\PDO::FETCH_ASSOC);    
+		$dados = $query->fetch(\PDO::FETCH_ASSOC);    
 		
 		//checa se existe o token
 		if(!empty($dados) || $dados != null){
-			$query = $conn->prepare("SELECT * FROM wp_postmeta WHERE token_key_url = '$serial_url'");
-			$query->execute();
-			$dados = $sql_user->fetch(\PDO::FETCH_ASSOC);  
-			
 			//checa se já existe domínio cadastrado
 			if(!empty($dados) || $dados != null){ 
 				$serial_por_url = explode(";", base64_decode($serial_url));
@@ -79,18 +75,18 @@ function valida_serial(){
 
 				//checa se o domínio cadastrado é igual ao da hospedagem
 				if($dominio == $_SERVER['HTTP_HOST']){
-					return true;
+					return "1";
 				}else{
-					return false;	
+					return "0";	
 				}
 			}else{
-				return false;
+				return "0";
 			}
 		}else{
-			return false;
+			return "0";
 		}
 	}else{
-		return false;
+		return "0";
 	}
 }
 
@@ -1031,11 +1027,14 @@ function change_price_order(){
 }
 
 add_action('admin_menu', 'addPluginAdminMenu');  
-function addPluginAdminMenu() {  
-	if(valida_serial()){
-		add_menu_page(  'Câmbio', 'Câmbio', 'administrator', 'vouchertec-cambio', 'displayPluginAdminDashboard', 'dashicons-chart-area', 26 );
-	}
-	add_submenu_page( 'vouchertec-cambio', 'Serial', 'Serial', 'administrator', 'vouchertec-cambio-settings', 'displayPluginAdminSettings');
+function addPluginAdminMenu() { 
+	$validar = valida_serial();
+	
+		add_menu_page(  'Câmbio', 'Câmbio', 'administrator', 'vouchertec-cambio', 'displayPluginAdminSettings', 'dashicons-chart-area', 26 );
+	if($validar == "1"){
+	add_submenu_page( 'vouchertec-cambio', 'Configuração', 'Configuração', 'administrator', 'vouchertec-cambio-settings', 'displayPluginAdminDashboard');
+}
+	
 }
 
 function displayPluginAdminDashboard() {
