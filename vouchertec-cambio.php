@@ -39,6 +39,40 @@ function cambio_update_checker_setting() {
 
     }
 
+function conectar_mysql_wp($server, $user, $pass, $database){  
+     
+        try{
+            // create a PostgreSQL database connection
+            $conn = new \PDO("mysql:host=$server;dbname=$database", $user, $pass);
+            
+            return $conn;
+        }catch (\PDOException $e){
+            // report error message
+            echo $e->getMessage();
+        }
+    } 
+
+function valida_serial(){
+	//1. checa se existe o token
+	//2. checa se já existe um domínio cadastrado para o token
+	$serial = get_option( 'serial' );
+	
+	$conn = $results->conectar_mysql_wp('162.214.165.237', 'travelte_wordpress', 'Travel#2021@', 'travelte_wordpress'); 
+	
+	if($serial != ""){
+		$query = $conn->prepare("SELECT * FROM wp_postmeta WHERE token_key = '$serial'");
+		$query->execute();
+		$dados = $sql_user->fetch(\PDO::FETCH_ASSOC);    
+		
+		if(!empty($dados) || $dados != null){
+			return true;
+		}else{
+			return false;
+		}
+	}else{
+		return false;
+	}
+}
 
 add_action( 'woocommerce_order_status_changed', 'your_function', 99, 3 ); 
 function your_function( $order_id, $old_status, $new_status ){  
@@ -979,7 +1013,9 @@ function change_price_order(){
 add_action('admin_menu', 'addPluginAdminMenu');  
 function addPluginAdminMenu() { 
 	add_menu_page(  'Câmbio', 'Câmbio', 'administrator', 'vouchertec-cambio', 'displayPluginAdminDashboard', 'dashicons-chart-area', 26 ); 
-	add_submenu_page( 'vouchertec-cambio', 'Serial', 'Serial', 'administrator', 'vouchertec-cambio-settings', 'displayPluginAdminSettings');
+	if(valida_serial()){
+		add_submenu_page( 'vouchertec-cambio', 'Serial', 'Serial', 'administrator', 'vouchertec-cambio-settings', 'displayPluginAdminSettings');
+	}
 }
 
 function displayPluginAdminDashboard() {
