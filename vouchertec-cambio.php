@@ -68,10 +68,15 @@ function valida_serial(){
 		
 		//checa se existe o token
 		if(!empty($dados) || $dados != null){
+			$subscription_id = $dados["post_id"];
+			
+			$query = $conn->prepare("SELECT * FROM wp_postmeta WHERE meta_key = 'token_url' AND post_id = '$subscription_id'");
+			$query->execute();
+			$dados = $query->fetch(\PDO::FETCH_ASSOC);    
+			
 			//checa se já existe domínio cadastrado
-			if(!empty($serial_url)){ 
-				$serial_por_url = explode(";", $serial_url);
-				$dominio = $serial_por_url[1];
+			if(!empty($dados)){ 
+				$dominio = $dados["meta_value"];
 
 				//checa se o domínio cadastrado é igual ao da hospedagem
 				if($dominio == $_SERVER['HTTP_HOST']){
@@ -89,29 +94,248 @@ function valida_serial(){
 		return "0d";
 	}
 }
+
+add_action( 'updated_option', 'updated_option_callback', 10, 3 );
+function updated_option_callback( $option, $old_value, $value ) {
+	$serial = get_option( 'serial' );
+		
+	$conn = conectar_mysql_wp('162.214.165.237', 'travelte_wordpress', 'Travel#2021@', 'travelte_wordpress');
+	
+	$query = $conn->prepare("SELECT * FROM wp_postmeta WHERE meta_key = 'token_key' AND meta_value = '$serial'");
+	$query->execute();
+	
+	$dados = $query->fetch(\PDO::FETCH_ASSOC); 
+	
+	$subscription_id = $dados["post_id"];
+			
+	$query = $conn->prepare("SELECT * FROM wp_postmeta WHERE meta_key = 'token_url' AND post_id = '$subscription_id'");
+	$query->execute();
+	$dados = $query->fetch(\PDO::FETCH_ASSOC);    
+	
+	$dominio = $dados["meta_value"];
+
+	//checa se o domínio cadastrado é igual ao da hospedagem
+	if($dominio !== $_SERVER['HTTP_HOST']){  
+		$url = $_SERVER['HTTP_HOST'];
+		$query = $conn->prepare("UPDATE wp_postmeta SET  meta_value = '$url' WHERE post_id = '$subscription_id' AND meta_key = 'token_url'");
+		$query->execute();
+	}
+}
 			    		 			
+$validar = valida_serial();  
+if($validar == "1"){
+	add_action( 'woocommerce_order_status_changed', 'your_function', 99, 3 ); 
+	function your_function( $order_id, $old_status, $new_status ){  
+			//your code here  
 
-add_action( 'woocommerce_order_status_changed', 'your_function', 99, 3 ); 
-function your_function( $order_id, $old_status, $new_status ){  
-		//your code here  
+		$order = wc_get_order( $order_id ); // The WC_Order object instance
 
-	$order = wc_get_order( $order_id ); // The WC_Order object instance
-	
-	$curl = curl_init();
+		$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+				CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_ENCODING => "",
+				CURLOPT_MAXREDIRS => 10,
+				CURLOPT_TIMEOUT => 30,
+				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				CURLOPT_CUSTOMREQUEST => "GET", 
+				CURLOPT_HTTPHEADER => array(
+					"cache-control: no-cache",
+					"content-type: application/json",
+					"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
+				),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			if ($err) {
+				echo "cURL Error #:" . $err;
+			} else {
+				$dados = array_values(json_decode($response, true)); 
+
+				$valor_converter_cambio_comercial = $dados[0]["high"];
+			}
+
+			$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+			  CURLOPT_URL => "https://app.parcelow.com/oauth/token",
+			  CURLOPT_RETURNTRANSFER => true,
+			  CURLOPT_ENCODING => "",
+			  CURLOPT_MAXREDIRS => 10,
+			  CURLOPT_TIMEOUT => 30,
+			  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			  CURLOPT_CUSTOMREQUEST => "POST",
+			  CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
+			  CURLOPT_HTTPHEADER => array(
+				"cache-control: no-cache",
+				"client_id: 105",
+				"client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
+				"content-type: application/json",
+				"grant_type: client_credentials",
+				"postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
+			  ),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			if ($err) {
+			  echo "cURL Error #:" . $err;
+			} else {
+			  $dados_oauth = json_decode($response, true); 
+			  $access_token = $dados_oauth["access_token"];
+			} 
+
+			$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+			  CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
+			  CURLOPT_RETURNTRANSFER => true,
+			  CURLOPT_ENCODING => "",
+			  CURLOPT_MAXREDIRS => 10,
+			  CURLOPT_TIMEOUT => 30,
+			  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			  CURLOPT_CUSTOMREQUEST => "GET",
+			  CURLOPT_HTTPHEADER => array(
+				"amount: 100",
+				"authorization: Bearer ".$access_token, 
+				"content-type: application/json" 
+			  ),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			$dados = json_decode($response, true); 
+
+
+			$valor_converter_cambio_turismo = $dados["data"]["dolar"];
+
+		// Loop through Order items ("line_item" type)
+		foreach( $order->get_items() as $item_id => $item ){
+			$product = $item->get_product();
+			$post_id = $product->get_id();
+			$product_price = (int) $product->get_price(); // A static replacement product price 
+
+			$dolar_comercial = get_post_meta( $post_id, '_evisa', true);
+			$dolar_turismo = get_post_meta( $post_id, '_ecred', true); 
+
+			$new_product_price = $product_price; 
+
+			$product_quantity = (int) $item->get_quantity(); // product Quantity
+
+			if ($dolar_comercial == 'yes') {
+
+				$valor_convertido = number_format(floatval($product_price)*floatval($valor_converter_cambio_comercial), 2, ".", "");
+
+				$new_product_price = $valor_convertido;   
+			}else if($dolar_turismo == 'yes'){
+
+				$valor_convertido = number_format(floatval($product_price)*floatval($valor_converter_cambio_turismo), 2, ".", "");
+
+				$new_product_price = $valor_convertido;   
+			}else{
+
+				$new_product_price = $product_price;   
+			}
+
+			// The new line item price
+			$new_line_item_price = $new_product_price * $product_quantity;
+
+			// Set the new price
+			$item->set_subtotal( $new_line_item_price ); 
+			$item->set_total( $new_line_item_price );
+
+			// Make new taxes calculations
+			$item->calculate_taxes();
+
+			$item->save(); // Save line item data
+		}
+		// Make the calculations  for the order and SAVE
+		$order->calculate_totals();   
+	}
+
+	function return_custom_price($price, $product) {
+		if(!is_admin()){
+			global $post, $blog_id;
+			$product = wc_get_product( '$post_id' );
+			$post_id = $post->ID;
+			$wc_product_id = 5266;
+
+			$dolar_comercial = get_post_meta( $post_id, '_evisa', true);
+			$dolar_turismo = get_post_meta( $post_id, '_ecred', true);
+
+			$valor = get_post_meta( get_the_ID(), '_regular_price', true); 
+
+			if($dolar_comercial == 'yes'){
+				$_SESSION['tipo_produto'] = 'comercial';
+
+				$curl = curl_init();
+
+				curl_setopt_array($curl, array(
+				  CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
+				  CURLOPT_RETURNTRANSFER => true,
+				  CURLOPT_ENCODING => "",
+				  CURLOPT_MAXREDIRS => 10,
+				  CURLOPT_TIMEOUT => 30,
+				  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				  CURLOPT_CUSTOMREQUEST => "GET", 
+				  CURLOPT_HTTPHEADER => array(
+					"cache-control: no-cache",
+					"content-type: application/json",
+					"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
+				  ),
+				));
+
+				$response = curl_exec($curl);
+				$err = curl_error($curl);
+
+				curl_close($curl);
+
+				if ($err) {
+					echo "cURL Error #:" . $err;
+				} else {
+					$dados = array_values(json_decode($response, true)); 
+
+					$valor_converter = $dados[0]["high"];
+
+				  $valor_convertido = number_format(floatval($price)*floatval($valor_converter), 2, ".", "");
+
+				  $price = $valor_convertido;  
+
+				} 
+				return $price;
+			}else if($dolar_turismo == 'yes'){
+				$_SESSION['tipo_produto'] = 'turismo';
+
+				$curl = curl_init();
 
 		curl_setopt_array($curl, array(
-			CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
-			CURLOPT_RETURNTRANSFER => true,
-			CURLOPT_ENCODING => "",
-			CURLOPT_MAXREDIRS => 10,
-			CURLOPT_TIMEOUT => 30,
-			CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-			CURLOPT_CUSTOMREQUEST => "GET", 
-			CURLOPT_HTTPHEADER => array(
-				"cache-control: no-cache",
-				"content-type: application/json",
-				"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
-			),
+		  CURLOPT_URL => "https://app.parcelow.com/oauth/token",
+		  CURLOPT_RETURNTRANSFER => true,
+		  CURLOPT_ENCODING => "",
+		  CURLOPT_MAXREDIRS => 10,
+		  CURLOPT_TIMEOUT => 30,
+		  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+		  CURLOPT_CUSTOMREQUEST => "POST",
+		  CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
+		  CURLOPT_HTTPHEADER => array(
+			"cache-control: no-cache",
+			"client_id: 105",
+			"client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
+			"content-type: application/json",
+			"grant_type: client_credentials",
+			"postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
+		  ),
 		));
 
 		$response = curl_exec($curl);
@@ -120,698 +344,507 @@ function your_function( $order_id, $old_status, $new_status ){
 		curl_close($curl);
 
 		if ($err) {
-			echo "cURL Error #:" . $err;
+		  echo "cURL Error #:" . $err;
 		} else {
-			$dados = array_values(json_decode($response, true)); 
-
-			$valor_converter_cambio_comercial = $dados[0]["high"];
-		}
+		  $dados_oauth = json_decode($response, true); 
+		  $access_token = $dados_oauth["access_token"];
+		} 
 
 		$curl = curl_init();
 
-	    curl_setopt_array($curl, array(
-	      CURLOPT_URL => "https://app.parcelow.com/oauth/token",
-	      CURLOPT_RETURNTRANSFER => true,
-	      CURLOPT_ENCODING => "",
-	      CURLOPT_MAXREDIRS => 10,
-	      CURLOPT_TIMEOUT => 30,
-	      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-	      CURLOPT_CUSTOMREQUEST => "POST",
-	      CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
-	      CURLOPT_HTTPHEADER => array(
-	        "cache-control: no-cache",
-	        "client_id: 105",
-	        "client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
-	        "content-type: application/json",
-	        "grant_type: client_credentials",
-	        "postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
-	      ),
-	    ));
+		curl_setopt_array($curl, array(
+		  CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
+		  CURLOPT_RETURNTRANSFER => true,
+		  CURLOPT_ENCODING => "",
+		  CURLOPT_MAXREDIRS => 10,
+		  CURLOPT_TIMEOUT => 30,
+		  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+		  CURLOPT_CUSTOMREQUEST => "GET",
+		  CURLOPT_HTTPHEADER => array(
+			"amount: 100",
+			"authorization: Bearer ".$access_token, 
+			"content-type: application/json" 
+		  ),
+		));
 
-	    $response = curl_exec($curl);
-	    $err = curl_error($curl);
+		$response = curl_exec($curl);
+		$err = curl_error($curl);
 
-	    curl_close($curl);
+		curl_close($curl);
 
-	    if ($err) {
-	      echo "cURL Error #:" . $err;
-	    } else {
-	      $dados_oauth = json_decode($response, true); 
-	      $access_token = $dados_oauth["access_token"];
-	    } 
+		$dados = json_decode($response, true); 
 
-	    $curl = curl_init();
 
-	    curl_setopt_array($curl, array(
-	      CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
-	      CURLOPT_RETURNTRANSFER => true,
-	      CURLOPT_ENCODING => "",
-	      CURLOPT_MAXREDIRS => 10,
-	      CURLOPT_TIMEOUT => 30,
-	      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-	      CURLOPT_CUSTOMREQUEST => "GET",
-	      CURLOPT_HTTPHEADER => array(
-	        "amount: 100",
-	        "authorization: Bearer ".$access_token, 
-	        "content-type: application/json" 
-	      ),
-	    ));
+				  $valor_converter = $dados["data"]["dolar"];
 
-	    $response = curl_exec($curl);
-	    $err = curl_error($curl);
+				  $valor_convertido = number_format(floatval($price)*floatval($valor_converter), 2, ".", "");
 
-	    curl_close($curl);
+				  $price = $valor_convertido; 
 
-	    $dados = json_decode($response, true); 
- 
+				return $price;
+			}else{
+				$_SESSION['tipo_produto'] = 'normal';
 
-        $valor_converter_cambio_turismo = $dados["data"]["dolar"];
-
-	// Loop through Order items ("line_item" type)
-	foreach( $order->get_items() as $item_id => $item ){
-	    $product = $item->get_product();
-		$post_id = $product->get_id();
-	    $product_price = (int) $product->get_price(); // A static replacement product price 
-	
-	    $dolar_comercial = get_post_meta( $post_id, '_evisa', true);
-	    $dolar_turismo = get_post_meta( $post_id, '_ecred', true); 
-	 
-	    $new_product_price = $product_price; 
-	 
-	    $product_quantity = (int) $item->get_quantity(); // product Quantity
-		
-		if ($dolar_comercial == 'yes') {
-
-			$valor_convertido = number_format(floatval($product_price)*floatval($valor_converter_cambio_comercial), 2, ".", "");
-
-			$new_product_price = $valor_convertido;   
-		}else if($dolar_turismo == 'yes'){
-
-			$valor_convertido = number_format(floatval($product_price)*floatval($valor_converter_cambio_turismo), 2, ".", "");
-
-			$new_product_price = $valor_convertido;   
-		}else{
-
-			$new_product_price = $product_price;   
-		}
-	    
-	    // The new line item price
-	    $new_line_item_price = $new_product_price * $product_quantity;
-	    
-	    // Set the new price
-	    $item->set_subtotal( $new_line_item_price ); 
-	    $item->set_total( $new_line_item_price );
-
-	    // Make new taxes calculations
-	    $item->calculate_taxes();
-
-	    $item->save(); // Save line item data
-	}
-	// Make the calculations  for the order and SAVE
-	$order->calculate_totals();   
-}
-
-function return_custom_price($price, $product) {
-	if(!is_admin()){
-		global $post, $blog_id;
-		$product = wc_get_product( '$post_id' );
-		$post_id = $post->ID;
-		$wc_product_id = 5266;
-	
-	    $dolar_comercial = get_post_meta( $post_id, '_evisa', true);
-	    $dolar_turismo = get_post_meta( $post_id, '_ecred', true);
-		
-		$valor = get_post_meta( get_the_ID(), '_regular_price', true); 
-		 
-		if($dolar_comercial == 'yes'){
-			$_SESSION['tipo_produto'] = 'comercial';
-			
-			$curl = curl_init();
-
-			curl_setopt_array($curl, array(
-			  CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
-			  CURLOPT_RETURNTRANSFER => true,
-			  CURLOPT_ENCODING => "",
-			  CURLOPT_MAXREDIRS => 10,
-			  CURLOPT_TIMEOUT => 30,
-			  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-			  CURLOPT_CUSTOMREQUEST => "GET", 
-			  CURLOPT_HTTPHEADER => array(
-				"cache-control: no-cache",
-				"content-type: application/json",
-				"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
-			  ),
-			));
-
-			$response = curl_exec($curl);
-			$err = curl_error($curl);
-
-			curl_close($curl);
-
-			if ($err) {
-				echo "cURL Error #:" . $err;
-			} else {
-				$dados = array_values(json_decode($response, true)); 
-				
-				$valor_converter = $dados[0]["high"];
-
-              $valor_convertido = number_format(floatval($price)*floatval($valor_converter), 2, ".", "");
-
-              $price = $valor_convertido;  
-				 
+				return $price;
 			} 
-			return $price;
-		}else if($dolar_turismo == 'yes'){
-			$_SESSION['tipo_produto'] = 'turismo';
-			
-			$curl = curl_init();
-
-    curl_setopt_array($curl, array(
-      CURLOPT_URL => "https://app.parcelow.com/oauth/token",
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => "",
-      CURLOPT_MAXREDIRS => 10,
-      CURLOPT_TIMEOUT => 30,
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-      CURLOPT_CUSTOMREQUEST => "POST",
-      CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
-      CURLOPT_HTTPHEADER => array(
-        "cache-control: no-cache",
-        "client_id: 105",
-        "client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
-        "content-type: application/json",
-        "grant_type: client_credentials",
-        "postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
-      ),
-    ));
-
-    $response = curl_exec($curl);
-    $err = curl_error($curl);
-
-    curl_close($curl);
-
-    if ($err) {
-      echo "cURL Error #:" . $err;
-    } else {
-      $dados_oauth = json_decode($response, true); 
-      $access_token = $dados_oauth["access_token"];
-    } 
-
-    $curl = curl_init();
-
-    curl_setopt_array($curl, array(
-      CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => "",
-      CURLOPT_MAXREDIRS => 10,
-      CURLOPT_TIMEOUT => 30,
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-      CURLOPT_CUSTOMREQUEST => "GET",
-      CURLOPT_HTTPHEADER => array(
-        "amount: 100",
-        "authorization: Bearer ".$access_token, 
-        "content-type: application/json" 
-      ),
-    ));
-
-    $response = curl_exec($curl);
-    $err = curl_error($curl);
-
-    curl_close($curl);
-
-    $dados = json_decode($response, true); 
- 
-
-              $valor_converter = $dados["data"]["dolar"];
-
-              $valor_convertido = number_format(floatval($price)*floatval($valor_converter), 2, ".", "");
-
-              $price = $valor_convertido; 
-			
-			return $price;
 		}else{
-			$_SESSION['tipo_produto'] = 'normal';
-			
 			return $price;
 		} 
-	}else{
-		return $price;
-	} 
-}
-add_filter('woocommerce_get_price', 'return_custom_price', 10, 2);
+	}
+	add_filter('woocommerce_get_price', 'return_custom_price', 10, 2);
 
-add_filter( 'woocommerce_variable_price_html', 'filter_wc_variable_price_html', 10, 2 );
-function filter_wc_variable_price_html( $price_html, $product ) {
-	if(!is_admin()){ 
-		$post_id = $product->get_id(); 
-	
-	    $dolar_comercial = get_post_meta( $post_id, '_evisa', true);
-	    $dolar_turismo = get_post_meta( $post_id, '_ecred', true); 
-		 
-		if($dolar_comercial == 'yes'){
-			$min_price = $product->get_variation_price( 'min' );  
-			$max_price = $product->get_variation_price( 'max' );  
-			
-			$_SESSION['tipo_produto'] = 'comercial';
-			
-			$curl = curl_init();
+	add_filter( 'woocommerce_variable_price_html', 'filter_wc_variable_price_html', 10, 2 );
+	function filter_wc_variable_price_html( $price_html, $product ) {
+		if(!is_admin()){ 
+			$post_id = $product->get_id(); 
 
-			curl_setopt_array($curl, array(
-			  CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
-			  CURLOPT_RETURNTRANSFER => true,
-			  CURLOPT_ENCODING => "",
-			  CURLOPT_MAXREDIRS => 10,
-			  CURLOPT_TIMEOUT => 30,
-			  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-			  CURLOPT_CUSTOMREQUEST => "GET", 
-			  CURLOPT_HTTPHEADER => array(
-				"cache-control: no-cache",
-				"content-type: application/json",
-				"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
-			  ),
-			));
+			$dolar_comercial = get_post_meta( $post_id, '_evisa', true);
+			$dolar_turismo = get_post_meta( $post_id, '_ecred', true); 
 
-			$response = curl_exec($curl);
-			$err = curl_error($curl);
+			if($dolar_comercial == 'yes'){
+				$min_price = $product->get_variation_price( 'min' );  
+				$max_price = $product->get_variation_price( 'max' );  
 
-			curl_close($curl);
+				$_SESSION['tipo_produto'] = 'comercial';
 
-			if ($err) {
-				echo "cURL Error #:" . $err;
-			} else {
-				$dados = array_values(json_decode($response, true)); 
-				
-				$valor_converter = $dados[0]["high"];
+				$curl = curl_init();
 
-              $price_min = number_format(floatval($min_price)*floatval($valor_converter), 2, ".", "");
-              $price_max = number_format(floatval($max_price)*floatval($valor_converter), 2, ".", ""); 
-				 
-			} 
+				curl_setopt_array($curl, array(
+				  CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
+				  CURLOPT_RETURNTRANSFER => true,
+				  CURLOPT_ENCODING => "",
+				  CURLOPT_MAXREDIRS => 10,
+				  CURLOPT_TIMEOUT => 30,
+				  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				  CURLOPT_CUSTOMREQUEST => "GET", 
+				  CURLOPT_HTTPHEADER => array(
+					"cache-control: no-cache",
+					"content-type: application/json",
+					"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
+				  ),
+				));
+
+				$response = curl_exec($curl);
+				$err = curl_error($curl);
+
+				curl_close($curl);
+
+				if ($err) {
+					echo "cURL Error #:" . $err;
+				} else {
+					$dados = array_values(json_decode($response, true)); 
+
+					$valor_converter = $dados[0]["high"];
+
+				  $price_min = number_format(floatval($min_price)*floatval($valor_converter), 2, ".", "");
+				  $price_max = number_format(floatval($max_price)*floatval($valor_converter), 2, ".", ""); 
+
+				} 
+				return '<span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">R$ </span>'.str_replace(".", ",", $price_min).' - <span class="woocommerce-Price-currencySymbol">R$ </span> '.str_replace(".", ",", $price_max).'</span></bdi>';
+			}else if($dolar_turismo == 'yes'){
+		// only for variable product 68719 
+
+				$min_price = $product->get_variation_price( 'min' );  
+				$max_price = $product->get_variation_price( 'max' );  
+
+		$curl = curl_init();
+
+		curl_setopt_array($curl, array(
+		  CURLOPT_URL => "https://app.parcelow.com/oauth/token",
+		  CURLOPT_RETURNTRANSFER => true,
+		  CURLOPT_ENCODING => "",
+		  CURLOPT_MAXREDIRS => 10,
+		  CURLOPT_TIMEOUT => 30,
+		  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+		  CURLOPT_CUSTOMREQUEST => "POST",
+		  CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
+		  CURLOPT_HTTPHEADER => array(
+			"cache-control: no-cache",
+			"client_id: 105",
+			"client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
+			"content-type: application/json",
+			"grant_type: client_credentials",
+			"postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
+		  ),
+		));
+
+		$response = curl_exec($curl);
+		$err = curl_error($curl);
+
+		curl_close($curl);
+
+		if ($err) {
+		  echo "cURL Error #:" . $err;
+		} else {
+		  $dados_oauth = json_decode($response, true); 
+		  $access_token = $dados_oauth["access_token"];
+		} 
+
+		$curl = curl_init();
+
+		curl_setopt_array($curl, array(
+		  CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
+		  CURLOPT_RETURNTRANSFER => true,
+		  CURLOPT_ENCODING => "",
+		  CURLOPT_MAXREDIRS => 10,
+		  CURLOPT_TIMEOUT => 30,
+		  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+		  CURLOPT_CUSTOMREQUEST => "GET",
+		  CURLOPT_HTTPHEADER => array(
+			"amount: 100",
+			"authorization: Bearer ".$access_token, 
+			"content-type: application/json" 
+		  ),
+		));
+
+		$response = curl_exec($curl);
+		$err = curl_error($curl);
+
+		curl_close($curl);
+
+		$dados = json_decode($response, true); 
+
+
+				  $valor_converter = $dados["data"]["dolar"];
+
+				  $price_min = number_format(floatval($min_price)*floatval($valor_converter), 2, ".", "");
+				  $price_max = number_format(floatval($max_price)*floatval($valor_converter), 2, ".", ""); 
+
+
 			return '<span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">R$ </span>'.str_replace(".", ",", $price_min).' - <span class="woocommerce-Price-currencySymbol">R$ </span> '.str_replace(".", ",", $price_max).'</span></bdi>';
-		}else if($dolar_turismo == 'yes'){
-    // only for variable product 68719 
+			}else{
+		// only for variable product 68719 
 
-			$min_price = $product->get_variation_price( 'min' );  
-			$max_price = $product->get_variation_price( 'max' );  
+				$min_price = $product->get_variation_price( 'min' );  
+				$max_price = $product->get_variation_price( 'max' );  
+			return '<span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">R$ </span>'.str_replace(".", ",", $min_price).' - <span class="woocommerce-Price-currencySymbol">R$ </span> '.str_replace(".", ",", $max_price).'</span></bdi>';
 
-    $curl = curl_init();
-
-    curl_setopt_array($curl, array(
-      CURLOPT_URL => "https://app.parcelow.com/oauth/token",
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => "",
-      CURLOPT_MAXREDIRS => 10,
-      CURLOPT_TIMEOUT => 30,
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-      CURLOPT_CUSTOMREQUEST => "POST",
-      CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
-      CURLOPT_HTTPHEADER => array(
-        "cache-control: no-cache",
-        "client_id: 105",
-        "client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
-        "content-type: application/json",
-        "grant_type: client_credentials",
-        "postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
-      ),
-    ));
-
-    $response = curl_exec($curl);
-    $err = curl_error($curl);
-
-    curl_close($curl);
-
-    if ($err) {
-      echo "cURL Error #:" . $err;
-    } else {
-      $dados_oauth = json_decode($response, true); 
-      $access_token = $dados_oauth["access_token"];
-    } 
-
-    $curl = curl_init();
-
-    curl_setopt_array($curl, array(
-      CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => "",
-      CURLOPT_MAXREDIRS => 10,
-      CURLOPT_TIMEOUT => 30,
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-      CURLOPT_CUSTOMREQUEST => "GET",
-      CURLOPT_HTTPHEADER => array(
-        "amount: 100",
-        "authorization: Bearer ".$access_token, 
-        "content-type: application/json" 
-      ),
-    ));
-
-    $response = curl_exec($curl);
-    $err = curl_error($curl);
-
-    curl_close($curl);
-
-    $dados = json_decode($response, true); 
- 
-
-              $valor_converter = $dados["data"]["dolar"];
-
-              $price_min = number_format(floatval($min_price)*floatval($valor_converter), 2, ".", "");
-              $price_max = number_format(floatval($max_price)*floatval($valor_converter), 2, ".", ""); 
-    
-
-        return '<span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">R$ </span>'.str_replace(".", ",", $price_min).' - <span class="woocommerce-Price-currencySymbol">R$ </span> '.str_replace(".", ",", $price_max).'</span></bdi>';
-		}else{
-    // only for variable product 68719 
-
-			$min_price = $product->get_variation_price( 'min' );  
-			$max_price = $product->get_variation_price( 'max' );  
-        return '<span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">R$ </span>'.str_replace(".", ",", $min_price).' - <span class="woocommerce-Price-currencySymbol">R$ </span> '.str_replace(".", ",", $max_price).'</span></bdi>';
-			
+			}
 		}
+
 	}
 
-}
+	add_action('woocommerce_before_add_to_cart_form', 'selected_variation_price_replace_variable_price_range');
+	function selected_variation_price_replace_variable_price_range(){
 
-add_action('woocommerce_before_add_to_cart_form', 'selected_variation_price_replace_variable_price_range');
-function selected_variation_price_replace_variable_price_range(){
+		global $product;
+		if( $product->is_type('variable') ):
 
-    global $product;
-    if( $product->is_type('variable') ):
+		 $min_price = $product->get_variation_price( 'min' ); 
+			$post_id = $product->get_id(); 
 
-     $min_price = $product->get_variation_price( 'min' ); 
-		$post_id = $product->get_id(); 
-	
-	    $dolar_comercial = get_post_meta( $post_id, '_evisa', true);
-	    $dolar_turismo = get_post_meta( $post_id, '_ecred', true); 
-		 
-		if($dolar_comercial == 'yes'){
-			$tipo_produto = 'comercial';
-		}else if($dolar_turismo == 'yes'){
-			$tipo_produto = 'turismo';
-		}else{
-			$tipo_produto = 'comercial';
-		} 
-    ?> 
-    <script>
-    jQuery(function($) { 
+			$dolar_comercial = get_post_meta( $post_id, '_evisa', true);
+			$dolar_turismo = get_post_meta( $post_id, '_ecred', true); 
 
-        $('form.cart').on('show_variation', function( event, data ) {
-            jQuery(".woocommerce-variation-price").html('');
-            jQuery(".single_variation").attr('style', 'display:none');
-            if ( data.price_html ) {
-				console.log(data.price_html);
-                jQuery(".woocommerce-variation-price").html('');
-                jQuery(".single_variation").attr('style', 'display:none');
-                jQuery.ajax({
-                    type: "POST",
-                    url: "/wp-content/plugins/voucher-cambio/includes/ajax-cambio.php",
-                    data: {price: data.price_html, produto: "<?=$tipo_produto?>"}, 
-                    success: function(result){ 
-						console.log(result);
-                        jQuery(".woocommerce-variation-price").html('<span class="price"><span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">R$ </span>'+result.replace(".", ",")+'</bdi></span>');
-                        jQuery(".single_variation").attr('style', '');
-                    }
+			if($dolar_comercial == 'yes'){
+				$tipo_produto = 'comercial';
+			}else if($dolar_turismo == 'yes'){
+				$tipo_produto = 'turismo';
+			}else{
+				$tipo_produto = 'comercial';
+			} 
+		?> 
+		<script>
+		jQuery(function($) { 
 
-                });
-            }
-        });
-    });
-    </script>
-    <?php
-    endif;
-}
+			$('form.cart').on('show_variation', function( event, data ) {
+				jQuery(".woocommerce-variation-price").html('');
+				jQuery(".single_variation").attr('style', 'display:none');
+				if ( data.price_html ) {
+					console.log(data.price_html);
+					jQuery(".woocommerce-variation-price").html('');
+					jQuery(".single_variation").attr('style', 'display:none');
+					jQuery.ajax({
+						type: "POST",
+						url: "/wp-content/plugins/voucher-cambio/includes/ajax-cambio.php",
+						data: {price: data.price_html, produto: "<?=$tipo_produto?>"}, 
+						success: function(result){ 
+							console.log(result);
+							jQuery(".woocommerce-variation-price").html('<span class="price"><span class="woocommerce-Price-amount amount"><bdi><span class="woocommerce-Price-currencySymbol">R$ </span>'+result.replace(".", ",")+'</bdi></span>');
+							jQuery(".single_variation").attr('style', '');
+						}
 
-add_action( 'woocommerce_before_calculate_totals', 'custom_cart_total2' );
-function custom_cart_total2() {
-
-    if ( is_admin() && ! defined( 'DOING_AJAX' ) )
-        return;
-
-    if ( did_action( 'woocommerce_before_calculate_totals' ) >= 2 )
-        return;  
-
-		$curl = curl_init();
-
-		curl_setopt_array($curl, array(
-			CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
-			CURLOPT_RETURNTRANSFER => true,
-			CURLOPT_ENCODING => "",
-			CURLOPT_MAXREDIRS => 10,
-			CURLOPT_TIMEOUT => 30,
-			CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-			CURLOPT_CUSTOMREQUEST => "GET", 
-			CURLOPT_HTTPHEADER => array(
-				"cache-control: no-cache",
-				"content-type: application/json",
-				"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
-			),
-		));
-
-		$response = curl_exec($curl);
-		$err = curl_error($curl);
-
-		curl_close($curl);
-
-		if ($err) {
-			echo "cURL Error #:" . $err;
-		} else {
-			$dados = array_values(json_decode($response, true)); 
-
-			$valor_converter_cambio_comercial = $dados[0]["high"];
-		}
-
-		$curl = curl_init();
-
-	    curl_setopt_array($curl, array(
-	      CURLOPT_URL => "https://app.parcelow.com/oauth/token",
-	      CURLOPT_RETURNTRANSFER => true,
-	      CURLOPT_ENCODING => "",
-	      CURLOPT_MAXREDIRS => 10,
-	      CURLOPT_TIMEOUT => 30,
-	      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-	      CURLOPT_CUSTOMREQUEST => "POST",
-	      CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
-	      CURLOPT_HTTPHEADER => array(
-	        "cache-control: no-cache",
-	        "client_id: 105",
-	        "client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
-	        "content-type: application/json",
-	        "grant_type: client_credentials",
-	        "postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
-	      ),
-	    ));
-
-	    $response = curl_exec($curl);
-	    $err = curl_error($curl);
-
-	    curl_close($curl);
-
-	    if ($err) {
-	      echo "cURL Error #:" . $err;
-	    } else {
-	      $dados_oauth = json_decode($response, true); 
-	      $access_token = $dados_oauth["access_token"];
-	    } 
-
-	    $curl = curl_init();
-
-	    curl_setopt_array($curl, array(
-	      CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
-	      CURLOPT_RETURNTRANSFER => true,
-	      CURLOPT_ENCODING => "",
-	      CURLOPT_MAXREDIRS => 10,
-	      CURLOPT_TIMEOUT => 30,
-	      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-	      CURLOPT_CUSTOMREQUEST => "GET",
-	      CURLOPT_HTTPHEADER => array(
-	        "amount: 100",
-	        "authorization: Bearer ".$access_token, 
-	        "content-type: application/json" 
-	      ),
-	    ));
-
-	    $response = curl_exec($curl);
-	    $err = curl_error($curl);
-
-	    curl_close($curl);
-
-	    $dados = json_decode($response, true); 
- 
-
-        $valor_converter_cambio_turismo = $dados["data"]["dolar"];
-
-    foreach ( WC()->cart->get_cart() as $cart_item ) {
-    	$post_id = $cart_item['product_id'];  
-	
-	    $dolar_comercial = get_post_meta( $post_id, '_evisa', true);
-	    $dolar_turismo = get_post_meta( $post_id, '_ecred', true); 
-		## Price calculation ## 
-
-		if ($dolar_comercial == 'yes') {
-
-			$valor_convertido = number_format(floatval($cart_item['data']->price)*floatval($valor_converter_cambio_comercial), 2, ".", "");
-
-			$price = $valor_convertido;   
-		}else if($dolar_turismo == 'yes'){
-
-			$valor_convertido = number_format(floatval($cart_item['data']->price)*floatval($valor_converter_cambio_turismo), 2, ".", "");
-
-			$price = $valor_convertido;   
-		}else{
-
-			$price = $cart_item['data']->price;   
-		}
-
-		## Set the price with WooCommerce compatibility ##
-		if ( version_compare( WC_VERSION, '3.0', '<' ) ) {
-			$cart_item['data']->price = $price; // Before WC 3.0
-		} else {
-			$cart_item['data']->set_price( $price ); // WC 3.0+
-		}       
-
-	}  
-
-}
-
-add_action('woocommerce_checkout_order_processed', 'action_checkout_order_processed', 10, 3);
-function action_checkout_order_processed( $order_id, $posted_data, $order ) { 
-	$order = wc_get_order($order_id);
-	
-	$curl = curl_init();
-
-		curl_setopt_array($curl, array(
-			CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
-			CURLOPT_RETURNTRANSFER => true,
-			CURLOPT_ENCODING => "",
-			CURLOPT_MAXREDIRS => 10,
-			CURLOPT_TIMEOUT => 30,
-			CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-			CURLOPT_CUSTOMREQUEST => "GET", 
-			CURLOPT_HTTPHEADER => array(
-				"cache-control: no-cache",
-				"content-type: application/json",
-				"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
-			),
-		));
-
-		$response = curl_exec($curl);
-		$err = curl_error($curl);
-
-		curl_close($curl);
-
-		if ($err) {
-			echo "cURL Error #:" . $err;
-		} else {
-			$dados = array_values(json_decode($response, true)); 
-
-			$valor_converter_cambio_comercial = $dados[0]["high"];
-		}
-
-		$curl = curl_init();
-
-	    curl_setopt_array($curl, array(
-	      CURLOPT_URL => "https://app.parcelow.com/oauth/token",
-	      CURLOPT_RETURNTRANSFER => true,
-	      CURLOPT_ENCODING => "",
-	      CURLOPT_MAXREDIRS => 10,
-	      CURLOPT_TIMEOUT => 30,
-	      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-	      CURLOPT_CUSTOMREQUEST => "POST",
-	      CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
-	      CURLOPT_HTTPHEADER => array(
-	        "cache-control: no-cache",
-	        "client_id: 105",
-	        "client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
-	        "content-type: application/json",
-	        "grant_type: client_credentials",
-	        "postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
-	      ),
-	    ));
-
-	    $response = curl_exec($curl);
-	    $err = curl_error($curl);
-
-	    curl_close($curl);
-
-	    if ($err) {
-	      echo "cURL Error #:" . $err;
-	    } else {
-	      $dados_oauth = json_decode($response, true); 
-	      $access_token = $dados_oauth["access_token"];
-	    } 
-
-	    $curl = curl_init();
-
-	    curl_setopt_array($curl, array(
-	      CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
-	      CURLOPT_RETURNTRANSFER => true,
-	      CURLOPT_ENCODING => "",
-	      CURLOPT_MAXREDIRS => 10,
-	      CURLOPT_TIMEOUT => 30,
-	      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-	      CURLOPT_CUSTOMREQUEST => "GET",
-	      CURLOPT_HTTPHEADER => array(
-	        "amount: 100",
-	        "authorization: Bearer ".$access_token, 
-	        "content-type: application/json" 
-	      ),
-	    ));
-
-	    $response = curl_exec($curl);
-	    $err = curl_error($curl);
-
-	    curl_close($curl);
-
-	    $dados = json_decode($response, true); 
- 
-
-        $valor_converter_cambio_turismo = $dados["data"]["dolar"];
-
-	// Loop through Order items ("line_item" type)
-	foreach( $order->get_items() as $item_id => $item ){
-	    $product = $item->get_product();
-		$post_id = $product->get_id();
-	    $product_price = (int) $product->get_price(); // A static replacement product price 
-	
-	    $dolar_comercial = get_post_meta( $post_id, '_evisa', true);
-	    $dolar_turismo = get_post_meta( $post_id, '_ecred', true); 
-	 
-	    $new_product_price = $product_price; 
-	 
-	    $product_quantity = (int) $item->get_quantity(); // product Quantity
-		
-		if ($dolar_comercial == 'yes') {
-
-			$valor_convertido = number_format(floatval($product_price)/floatval($valor_converter_cambio_comercial), 2, ".", "");
-
-			$new_product_price = $valor_convertido;   
-		}else if($dolar_turismo == 'yes'){
-
-			$valor_convertido = number_format(floatval($product_price)/floatval($valor_converter_cambio_turismo), 2, ".", "");
-
-			$new_product_price = $valor_convertido;   
-		}else{
-
-			$new_product_price = $product_price;   
-		}
-	    
-	    // The new line item price
-	    $new_line_item_price = $new_product_price * $product_quantity;
-	    
-	    // Set the new price
-	    $item->set_subtotal( $new_line_item_price ); 
-	    $item->set_total( $new_line_item_price );
-
-	    // Make new taxes calculations
-	    $item->calculate_taxes();
-
-	    $item->save(); // Save line item data
+					});
+				}
+			});
+		});
+		</script>
+		<?php
+		endif;
 	}
-	// Make the calculations  for the order and SAVE
-	$order->calculate_totals();
-	
-	
-}
 
+	add_action( 'woocommerce_before_calculate_totals', 'custom_cart_total2' );
+	function custom_cart_total2() {
+
+		if ( is_admin() && ! defined( 'DOING_AJAX' ) )
+			return;
+
+		if ( did_action( 'woocommerce_before_calculate_totals' ) >= 2 )
+			return;  
+
+			$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+				CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_ENCODING => "",
+				CURLOPT_MAXREDIRS => 10,
+				CURLOPT_TIMEOUT => 30,
+				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				CURLOPT_CUSTOMREQUEST => "GET", 
+				CURLOPT_HTTPHEADER => array(
+					"cache-control: no-cache",
+					"content-type: application/json",
+					"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
+				),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			if ($err) {
+				echo "cURL Error #:" . $err;
+			} else {
+				$dados = array_values(json_decode($response, true)); 
+
+				$valor_converter_cambio_comercial = $dados[0]["high"];
+			}
+
+			$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+			  CURLOPT_URL => "https://app.parcelow.com/oauth/token",
+			  CURLOPT_RETURNTRANSFER => true,
+			  CURLOPT_ENCODING => "",
+			  CURLOPT_MAXREDIRS => 10,
+			  CURLOPT_TIMEOUT => 30,
+			  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			  CURLOPT_CUSTOMREQUEST => "POST",
+			  CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
+			  CURLOPT_HTTPHEADER => array(
+				"cache-control: no-cache",
+				"client_id: 105",
+				"client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
+				"content-type: application/json",
+				"grant_type: client_credentials",
+				"postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
+			  ),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			if ($err) {
+			  echo "cURL Error #:" . $err;
+			} else {
+			  $dados_oauth = json_decode($response, true); 
+			  $access_token = $dados_oauth["access_token"];
+			} 
+
+			$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+			  CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
+			  CURLOPT_RETURNTRANSFER => true,
+			  CURLOPT_ENCODING => "",
+			  CURLOPT_MAXREDIRS => 10,
+			  CURLOPT_TIMEOUT => 30,
+			  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			  CURLOPT_CUSTOMREQUEST => "GET",
+			  CURLOPT_HTTPHEADER => array(
+				"amount: 100",
+				"authorization: Bearer ".$access_token, 
+				"content-type: application/json" 
+			  ),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			$dados = json_decode($response, true); 
+
+
+			$valor_converter_cambio_turismo = $dados["data"]["dolar"];
+
+		foreach ( WC()->cart->get_cart() as $cart_item ) {
+			$post_id = $cart_item['product_id'];  
+
+			$dolar_comercial = get_post_meta( $post_id, '_evisa', true);
+			$dolar_turismo = get_post_meta( $post_id, '_ecred', true); 
+			## Price calculation ## 
+
+			if ($dolar_comercial == 'yes') {
+
+				$valor_convertido = number_format(floatval($cart_item['data']->price)*floatval($valor_converter_cambio_comercial), 2, ".", "");
+
+				$price = $valor_convertido;   
+			}else if($dolar_turismo == 'yes'){
+
+				$valor_convertido = number_format(floatval($cart_item['data']->price)*floatval($valor_converter_cambio_turismo), 2, ".", "");
+
+				$price = $valor_convertido;   
+			}else{
+
+				$price = $cart_item['data']->price;   
+			}
+
+			## Set the price with WooCommerce compatibility ##
+			if ( version_compare( WC_VERSION, '3.0', '<' ) ) {
+				$cart_item['data']->price = $price; // Before WC 3.0
+			} else {
+				$cart_item['data']->set_price( $price ); // WC 3.0+
+			}       
+
+		}  
+
+	}
+
+	add_action('woocommerce_checkout_order_processed', 'action_checkout_order_processed', 10, 3);
+	function action_checkout_order_processed( $order_id, $posted_data, $order ) { 
+		$order = wc_get_order($order_id);
+
+		$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+				CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_ENCODING => "",
+				CURLOPT_MAXREDIRS => 10,
+				CURLOPT_TIMEOUT => 30,
+				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				CURLOPT_CUSTOMREQUEST => "GET", 
+				CURLOPT_HTTPHEADER => array(
+					"cache-control: no-cache",
+					"content-type: application/json",
+					"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
+				),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			if ($err) {
+				echo "cURL Error #:" . $err;
+			} else {
+				$dados = array_values(json_decode($response, true)); 
+
+				$valor_converter_cambio_comercial = $dados[0]["high"];
+			}
+
+			$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+			  CURLOPT_URL => "https://app.parcelow.com/oauth/token",
+			  CURLOPT_RETURNTRANSFER => true,
+			  CURLOPT_ENCODING => "",
+			  CURLOPT_MAXREDIRS => 10,
+			  CURLOPT_TIMEOUT => 30,
+			  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			  CURLOPT_CUSTOMREQUEST => "POST",
+			  CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
+			  CURLOPT_HTTPHEADER => array(
+				"cache-control: no-cache",
+				"client_id: 105",
+				"client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
+				"content-type: application/json",
+				"grant_type: client_credentials",
+				"postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
+			  ),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			if ($err) {
+			  echo "cURL Error #:" . $err;
+			} else {
+			  $dados_oauth = json_decode($response, true); 
+			  $access_token = $dados_oauth["access_token"];
+			} 
+
+			$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+			  CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
+			  CURLOPT_RETURNTRANSFER => true,
+			  CURLOPT_ENCODING => "",
+			  CURLOPT_MAXREDIRS => 10,
+			  CURLOPT_TIMEOUT => 30,
+			  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			  CURLOPT_CUSTOMREQUEST => "GET",
+			  CURLOPT_HTTPHEADER => array(
+				"amount: 100",
+				"authorization: Bearer ".$access_token, 
+				"content-type: application/json" 
+			  ),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			$dados = json_decode($response, true); 
+
+
+			$valor_converter_cambio_turismo = $dados["data"]["dolar"];
+
+		// Loop through Order items ("line_item" type)
+		foreach( $order->get_items() as $item_id => $item ){
+			$product = $item->get_product();
+			$post_id = $product->get_id();
+			$product_price = (int) $product->get_price(); // A static replacement product price 
+
+			$dolar_comercial = get_post_meta( $post_id, '_evisa', true);
+			$dolar_turismo = get_post_meta( $post_id, '_ecred', true); 
+
+			$new_product_price = $product_price; 
+
+			$product_quantity = (int) $item->get_quantity(); // product Quantity
+
+			if ($dolar_comercial == 'yes') {
+
+				$valor_convertido = number_format(floatval($product_price)/floatval($valor_converter_cambio_comercial), 2, ".", "");
+
+				$new_product_price = $valor_convertido;   
+			}else if($dolar_turismo == 'yes'){
+
+				$valor_convertido = number_format(floatval($product_price)/floatval($valor_converter_cambio_turismo), 2, ".", "");
+
+				$new_product_price = $valor_convertido;   
+			}else{
+
+				$new_product_price = $product_price;   
+			}
+
+			// The new line item price
+			$new_line_item_price = $new_product_price * $product_quantity;
+
+			// Set the new price
+			$item->set_subtotal( $new_line_item_price ); 
+			$item->set_total( $new_line_item_price );
+
+			// Make new taxes calculations
+			$item->calculate_taxes();
+
+			$item->save(); // Save line item data
+		}
+		// Make the calculations  for the order and SAVE
+		$order->calculate_totals();
+
+
+	}
+}
 
 function my_enqueue() { 
     wp_enqueue_style('bootstrap-datepicker', 'https://apps.bdimg.com/libs/jqueryui/1.10.4/css/jquery-ui.min.css');
@@ -876,160 +909,164 @@ function hide_coupon_field_on_cart_cambio( $enabled ) {
       $allow = 'no';
       return $allow;
     } 
-add_action( 'wp_ajax_change_price_order', 'change_price_order' );
-add_action( 'wp_ajax_nopriv_change_price_order', 'change_price_order' );
-function change_price_order(){
-	$order_id = $_POST['order'];
-	
-	$order = wc_get_order($order_id);
-	
-	$curl = curl_init();
 
-		curl_setopt_array($curl, array(
-			CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
-			CURLOPT_RETURNTRANSFER => true,
-			CURLOPT_ENCODING => "",
-			CURLOPT_MAXREDIRS => 10,
-			CURLOPT_TIMEOUT => 30,
-			CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-			CURLOPT_CUSTOMREQUEST => "GET", 
-			CURLOPT_HTTPHEADER => array(
-				"cache-control: no-cache",
-				"content-type: application/json",
-				"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
-			),
-		));
+$validar = valida_serial();  
+if($validar == "1"){
+	add_action( 'wp_ajax_change_price_order', 'change_price_order' );
+	add_action( 'wp_ajax_nopriv_change_price_order', 'change_price_order' );
+	function change_price_order(){
+		$order_id = $_POST['order'];
 
-		$response = curl_exec($curl);
-		$err = curl_error($curl);
-
-		curl_close($curl);
-
-		if ($err) {
-			echo "cURL Error #:" . $err;
-		} else {
-			$dados = array_values(json_decode($response, true)); 
-
-			$valor_converter_cambio_comercial = $dados[0]["high"];
-		}
+		$order = wc_get_order($order_id);
 
 		$curl = curl_init();
 
-	    curl_setopt_array($curl, array(
-	      CURLOPT_URL => "https://app.parcelow.com/oauth/token",
-	      CURLOPT_RETURNTRANSFER => true,
-	      CURLOPT_ENCODING => "",
-	      CURLOPT_MAXREDIRS => 10,
-	      CURLOPT_TIMEOUT => 30,
-	      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-	      CURLOPT_CUSTOMREQUEST => "POST",
-	      CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
-	      CURLOPT_HTTPHEADER => array(
-	        "cache-control: no-cache",
-	        "client_id: 105",
-	        "client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
-	        "content-type: application/json",
-	        "grant_type: client_credentials",
-	        "postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
-	      ),
-	    ));
+			curl_setopt_array($curl, array(
+				CURLOPT_URL => "https://economia.awesomeapi.com.br/last/USD-BRL",
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_ENCODING => "",
+				CURLOPT_MAXREDIRS => 10,
+				CURLOPT_TIMEOUT => 30,
+				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				CURLOPT_CUSTOMREQUEST => "GET", 
+				CURLOPT_HTTPHEADER => array(
+					"cache-control: no-cache",
+					"content-type: application/json",
+					"postman-token: 8296d4a5-27c8-417d-0b20-8b36ced8c445"
+				),
+			));
 
-	    $response = curl_exec($curl);
-	    $err = curl_error($curl);
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
 
-	    curl_close($curl);
+			curl_close($curl);
 
-	    if ($err) {
-	      echo "cURL Error #:" . $err;
-	    } else {
-	      $dados_oauth = json_decode($response, true); 
-	      $access_token = $dados_oauth["access_token"];
-	    } 
+			if ($err) {
+				echo "cURL Error #:" . $err;
+			} else {
+				$dados = array_values(json_decode($response, true)); 
 
-	    $curl = curl_init();
-
-	    curl_setopt_array($curl, array(
-	      CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
-	      CURLOPT_RETURNTRANSFER => true,
-	      CURLOPT_ENCODING => "",
-	      CURLOPT_MAXREDIRS => 10,
-	      CURLOPT_TIMEOUT => 30,
-	      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-	      CURLOPT_CUSTOMREQUEST => "GET",
-	      CURLOPT_HTTPHEADER => array(
-	        "amount: 100",
-	        "authorization: Bearer ".$access_token, 
-	        "content-type: application/json" 
-	      ),
-	    ));
-
-	    $response = curl_exec($curl);
-	    $err = curl_error($curl);
-
-	    curl_close($curl);
-
-	    $dados = json_decode($response, true); 
- 
-
-        $valor_converter_cambio_turismo = $dados["data"]["dolar"];
-
-	// Loop through Order items ("line_item" type)
-	foreach( $order->get_items() as $item_id => $item ){
-	    $product = $item->get_product();
-		$post_id = $item->get_product_id(); 
-	    $product_price = (int) $product->get_price(); // A static replacement product price 
-	
-	    $dolar_comercial = get_post_meta( $post_id, '_evisa', true);
-	    $dolar_turismo = get_post_meta( $post_id, '_ecred', true);  
-	 
-	    $new_product_price = $product_price; 
-	 
-	    $product_quantity = (int) $item->get_quantity(); // product Quantity
-		
-		if ($dolar_comercial == 'yes') {
-
-			$valor_convertido = number_format(floatval($product_price)*floatval($valor_converter_cambio_comercial), 2, ".", "");
-
-			$new_product_price = $valor_convertido;   
-		}else if($dolar_turismo == 'yes'){
-
-			$valor_convertido = number_format(floatval($product_price)*floatval($valor_converter_cambio_turismo), 2, ".", "");
-
-			$new_product_price = $valor_convertido;   
-		}else{
-
-			$new_product_price = $product_price;   
-		}
-	    
-	    // The new line item price
-	    $new_line_item_price = $new_product_price * $product_quantity; 
-	    
-	    // Set the new price
-	    $item->set_subtotal( $new_line_item_price ); 
-	    $item->set_total( $new_line_item_price );
-
-	    // Make new taxes calculations
-	    $item->calculate_taxes();
-
-	    $item->save(); // Save line item data
-	}
-	// Make the calculations  for the order and SAVE
-	$order->calculate_totals();
-	
-	$mailer = WC()->mailer();
-	$mails = $mailer->get_emails();
-	if ( ! empty( $mails ) ) {                
-		foreach ( $mails as $mail ) {
-			if ( $mail->id == 'new_order' || $mail->id == 'customer_processing_order' ){
-				$mail->trigger( $order_id );    
+				$valor_converter_cambio_comercial = $dados[0]["high"];
 			}
-		}            
+
+			$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+			  CURLOPT_URL => "https://app.parcelow.com/oauth/token",
+			  CURLOPT_RETURNTRANSFER => true,
+			  CURLOPT_ENCODING => "",
+			  CURLOPT_MAXREDIRS => 10,
+			  CURLOPT_TIMEOUT => 30,
+			  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			  CURLOPT_CUSTOMREQUEST => "POST",
+			  CURLOPT_POSTFIELDS => "{\n\t\"client_id\": \"105\",\n\t\"client_secret\": \"AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53\",\n\t\"grant_type\": \"client_credentials\"\n}",
+			  CURLOPT_HTTPHEADER => array(
+				"cache-control: no-cache",
+				"client_id: 105",
+				"client_secret: AO6jnqgvEkwwEaajN7CaTRMmloW3O4YUEVOrEW53",
+				"content-type: application/json",
+				"grant_type: client_credentials",
+				"postman-token: cefe5fcc-d209-3170-5b95-5f895ad044ed"
+			  ),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			if ($err) {
+			  echo "cURL Error #:" . $err;
+			} else {
+			  $dados_oauth = json_decode($response, true); 
+			  $access_token = $dados_oauth["access_token"];
+			} 
+
+			$curl = curl_init();
+
+			curl_setopt_array($curl, array(
+			  CURLOPT_URL => "https://app.parcelow.com/api/simulate?amount=1000",
+			  CURLOPT_RETURNTRANSFER => true,
+			  CURLOPT_ENCODING => "",
+			  CURLOPT_MAXREDIRS => 10,
+			  CURLOPT_TIMEOUT => 30,
+			  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			  CURLOPT_CUSTOMREQUEST => "GET",
+			  CURLOPT_HTTPHEADER => array(
+				"amount: 100",
+				"authorization: Bearer ".$access_token, 
+				"content-type: application/json" 
+			  ),
+			));
+
+			$response = curl_exec($curl);
+			$err = curl_error($curl);
+
+			curl_close($curl);
+
+			$dados = json_decode($response, true); 
+
+
+			$valor_converter_cambio_turismo = $dados["data"]["dolar"];
+
+		// Loop through Order items ("line_item" type)
+		foreach( $order->get_items() as $item_id => $item ){
+			$product = $item->get_product();
+			$post_id = $item->get_product_id(); 
+			$product_price = (int) $product->get_price(); // A static replacement product price 
+
+			$dolar_comercial = get_post_meta( $post_id, '_evisa', true);
+			$dolar_turismo = get_post_meta( $post_id, '_ecred', true);  
+
+			$new_product_price = $product_price; 
+
+			$product_quantity = (int) $item->get_quantity(); // product Quantity
+
+			if ($dolar_comercial == 'yes') {
+
+				$valor_convertido = number_format(floatval($product_price)*floatval($valor_converter_cambio_comercial), 2, ".", "");
+
+				$new_product_price = $valor_convertido;   
+			}else if($dolar_turismo == 'yes'){
+
+				$valor_convertido = number_format(floatval($product_price)*floatval($valor_converter_cambio_turismo), 2, ".", "");
+
+				$new_product_price = $valor_convertido;   
+			}else{
+
+				$new_product_price = $product_price;   
+			}
+
+			// The new line item price
+			$new_line_item_price = $new_product_price * $product_quantity; 
+
+			// Set the new price
+			$item->set_subtotal( $new_line_item_price ); 
+			$item->set_total( $new_line_item_price );
+
+			// Make new taxes calculations
+			$item->calculate_taxes();
+
+			$item->save(); // Save line item data
+		}
+		// Make the calculations  for the order and SAVE
+		$order->calculate_totals();
+
+		$mailer = WC()->mailer();
+		$mails = $mailer->get_emails();
+		if ( ! empty( $mails ) ) {                
+			foreach ( $mails as $mail ) {
+				if ( $mail->id == 'new_order' || $mail->id == 'customer_processing_order' ){
+					$mail->trigger( $order_id );    
+				}
+			}            
+		}
 	}
 }
 
 add_action('admin_menu', 'addPluginAdminMenu');  
 function addPluginAdminMenu() { 
-	$validar = valida_serial(); 
+	$validar = valida_serial();  
 	
 		add_menu_page(  'Câmbio', 'Câmbio', 'administrator', 'vouchertec-cambio', 'displayPluginAdminSettings', 'dashicons-chart-area', 26 );
 	if($validar == "1"){
