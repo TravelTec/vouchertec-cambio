@@ -7,7 +7,7 @@ defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
  	* Description: Utilize o plugin de Câmbio para conversão dos valores dos seus produtos Woocommerce.
  	* Author: Travel Tec
  	* Author URI: https://traveltec.com.br
- 	* Version: 1.2.4
+ 	* Version: 1.3.0
  	*
  */
 session_start(); 
